@@ -1,0 +1,62 @@
+name: lint-test-and-release
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  lint-test-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+
+      - name: Install apt dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y zsh jq fzf
+
+      - name: Lint
+        run: shellcheck boom
+
+      - name: Install npm packages
+        run: npm install --include=dev
+
+      - name: Test with bash
+        shell: bash
+        run: npm test
+
+      - name: Test with zsh
+        shell: zsh {0}
+        run: npm test
+
+      - name: Check if boom version matches the tag
+        run: |
+          # GITHUB_REF looks something like refs/tags/1.0.0
+          # Use ##*/ to greedily match * until the last /
+          tag_version="${GITHUB_REF##*/}"
+          boom_version=$(grep -A 1 "RELEASEVERSION" boom | tail -n 1 | cut -d '"' -f 2)
+          if [ "${boom_version}" != "${tag_version}" ]; then
+            echo "boom version ($boom_version) does not match tag ($tag_version)"
+            exit 1
+          fi
+
+      - name: Get details for the current release
+        run: |
+          ./greplog "${GITHUB_REF##*/}" > /tmp/RELEASE-NOTES
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            boom
+            LICENSE
+          body_path: /tmp/RELEASE-NOTES

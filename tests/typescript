@@ -1,0 +1,36 @@
+Script started on 2025-06-18 22:37:41+02:00 [TERM="tmux-256color" TTY="/dev/pts/3" COLUMNS="-1" LINES="-1"]
+foobar echo "foobar" 
+hello world echo "$hello $world" (env) 
+hello moon echo "$hello $moon" (env) 
+cat makes meow cat (stdin)
+cat makes meeoow cat (stdin)
+eilsel tsief sort $SORT_OPTION (env) (stdin)
+unix timestamp echo -n "$(cat -)" && echo -n ' 0 is ' && echo "$D... (env) (stdin)
+duplicate entry echo 2 
+space in group space in subgroup space in command echo 'whoa' 
+bar echo 'first bar' 
+foo bar echo 'second bar' 
+space echo $VARIABLE (env) 
+env starting with digit echo $VARIABLE (env) 
+env containing space echo $VARIABLE (env) 
+env is empty echo $VARIABLE (env) 
+env containing hyphen echo $VARIABLE (env) 
+group subgroup foo echo "foo" 
+group bar echo "bar" 
+pipe echo 'whoop' | grep 'whoop' 
+redirect-stdout echo 'stdout' > ./output && cat output 
+redirect-stdin cat < ./input 
+background-task sleep 1 & echo 'sleeping' && wait 
+stderr echo 'stderr' >&2 
+stdout-stderr echo 'stdout' && echo 'stderr' >&2 
+exit-code exit 123 
+pipe-concat-fail-first exit 2 | echo 'yeah' 
+pipe-concat-fail-second echo 'yeah' | exit 2 | echo 'yeah' 
+and-concat-fail exit 2 && echo 'nope' 
+or-concat-fail exit 2 || echo 'yeah' 
+long-output for i in {1..1000}; do echo "$i"; done 
+all-the-quotes echo "'single' and \"double\"" 
+unicode echo '🤘' 
+env-fail echo 'yeah' (env) 
+
+Script done on 2025-06-18 22:37:41+02:00 [COMMAND_EXIT_CODE="0"]

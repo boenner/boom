@@ -1,0 +1,37 @@
+name: lint-and-test
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+
+      - name: Install apt dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y zsh jq fzf
+
+      - name: Lint
+        run: shellcheck boom
+
+      - name: Install npm packages
+        run: npm install --include=dev
+
+      - name: Test with bash
+        shell: bash
+        run: npm test
+
+      - name: Test with zsh
+        shell: zsh {0}
+        run: npm test

@@ -1,0 +1,429 @@
+#!/bin/bash
+
+# boom - Shell command launcher with JSON configuration
+# Copyright (C) 2025 Tobias Bönner
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# Disable "don't use variables in printf" for all error messages
+# shellcheck disable=SC2059
+
+# RELEASEVERSION. Comment for release pipeline to easily check the version.
+version="1.0.0"
+
+red="\033[0;31m"
+blue="\033[0;34m"
+green="\033[0;32m"
+yellow="\033[0;33m"
+reset="\033[0m"
+
+terminal_output=true
+if [ ! -t 1 ]; then
+    terminal_output=false
+fi
+
+# When the output is not sent to a terminal, skip the colors
+if [[ "${terminal_output}" == false ]]; then
+    red=""
+    blue=""
+    green=""
+    yellow=""
+    reset=""
+fi
+
+if [ -z "$BASH_VERSION" ] && [ -z "$ZSH_VERSION" ]; then
+    printf "${red}Error${reset}: Currently only tested with bash and zsh.\n" 1>&2
+    exit 1
+fi
+
+check_version() (
+    expected=$1
+    found=$2
+    if [[ "$(printf "%s\n%s\n" "${expected}" "${found}" | sort -V | head -n 1)" == "$expected" ]]; then
+        return 0
+    else
+        return 1
+    fi
+)
+
+dependencies=(
+	"jq"
+    "fzf"
+)
+for dependency in "${dependencies[@]}"; do
+	if ! command -v "${dependency}" > /dev/null; then
+        printf "${red}Error${reset}: It seems like \"%s\" is not available. Please install it before running this script.\n" "${dependency}" 1>&2
+        exit 1
+	fi
+done
+
+min_fzf_version="0.16.8"
+if ! check_version "${min_fzf_version}" "$(fzf --version | head -n 1 | cut -d ' ' -f 1)"; then
+    printf "${red}Error${reset}: You need at least fzf version %s to run boom.\n" "${min_fzf_version}" 1>&2
+    exit 1
+fi
+
+min_jq_version="1.5"
+if ! check_version "${min_jq_version}" "$(jq --version | head -n 1 | cut -d '-' -f 2)"; then
+    printf "${red}Error${reset}: You need at least jq version %s to run boom.\n" "${min_jq_version}" 1>&2
+    exit 1
+fi
+
+action=""
+group=""
+subgroup=""
+command=""
+help=false
+verbose=false
+config="${BOOMCONF:-$HOME/.boomconf.json}"
+
+# The delimiter will be used to load all data into fzf with the --delimiter and --with-nth parameters
+# As the delimiter will be shown in the fzf list, use the information separator control character
+delimiter=$'\u001F'
+
+parse_parameter() {
+    if [[ "${1}" == *=* ]]; then
+        param="${1%%=*}"
+        value="${1#*=}"
+    else
+        param="${1}"
+        if [[ -n "${2}" && "${2}" != -* ]]; then
+            value="${2}"
+            # When it's not param=value but param value we need to do an extra shift
+            shifty=true
+        else
+            value=""
+            shifty=false
+        fi
+    fi
+    if [[ -z "${value}" ]]; then
+        printf "${red}Error${reset}: %s parameter given without value\n" "${param}" 1>&2
+        exit 1
+    fi
+}
+
+check_action() {
+    if [[ -n "${action}" ]]; then
+        printf "${red}Error${reset}: Only one action allowed! \"%s\" action already given\n" "${action}" 1>&2
+        exit 1
+    fi
+}
+
+while [[ "$#" -gt 0 ]]; do
+    case "${1}" in
+        -V|--version)
+            echo "${version}"
+            exit 0
+            ;;
+        -v|--verbose)
+            verbose=true
+            ;;
+        -h|--help)
+            help=true
+            ;;
+        -d|--delimiter|--delimiter=*)
+            parse_parameter "${1}" "${2}"
+            delimiter="${value}"
+            if [[ ! "${delimiter}" =~ ^.$ ]]; then
+                printf "${red}Error${reset}: The delimiter must be a single character" 1>&2
+                exit 1
+            fi
+            if [[ "${shifty}" == true ]]; then
+                shift
+            fi
+            ;;
+        -c|--config|--config=*)
+            parse_parameter "${1}" "${2}"
+            config="${value}"
+            if [[ "${shifty}" == true ]]; then
+                shift
+            fi
+            ;;
+        -g|--group|--group=*)
+            parse_parameter "${1}" "${2}"
+            group="${value}"
+            if [[ "${shifty}" == true ]]; then
+                shift
+            fi
+            ;;
+        -s|--subgroup|--subgroup=*)
+            parse_parameter "${1}" "${2}"
+            subgroup="${value}"
+            if [[ "${shifty}" == true ]]; then
+                shift
+            fi
+            ;;
+        -l|--list)
+            check_action
+            action="list"
+            ;;
+        -x|--exec|--exec=*)
+            check_action
+            action="exec"
+            parse_parameter "${1}" "${2}"
+            command="${value}"
+            if [[ "${shifty}" == true ]]; then
+                shift
+            fi
+            ;;
+        *)
+            printf "${red}Error${reset}: %s parameter/action does not exist.\n" "${1}" 1>&2
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [[ "${verbose}" == true ]]; then
+    set -x
+fi
+
+if [[ "${help}" == true ]]; then
+    cat <<HELPTEXT
+boom - Shell command launcher with JSON configuration
+
+Usage: boom [OPTIONS]
+
+Options:
+	-l, --list                 list all commands
+	-x, --exec COMMAND         execute a command
+	-c, --config PATH          file path to a custom configuration
+	-d, --delimiter CHAR       specify custom delimiter for fzf
+	-g, --group GROUP          set the group
+	-s, --subgroup SUBGROUP    set the subgroup
+	-h, --help                 display this help and exit
+	-v, --verbose              enable verbose mode
+	-V, --version              output version information and exit
+
+Examples:
+	# Fuzzy search commands
+	boom
+
+	# List all commands in a group
+	boom --list --group postgres
+
+	# Execute a specific command from a subgroup
+	boom --exec "get users" --group postgres --subgroup local
+
+	# Use custom config file
+	boom --config /path/to/myconfig --exec foobar
+
+Notes:
+	~/.boomconf.json is the default configuration file location
+
+	Use the BOOMCONF environment variable for an alternative
+	configuration file path
+
+	Default delimiter for fzf is U+001F (Information Separator One)
+	Do not use this character in commands or specify an alternative
+	using the --delimiter option
+HELPTEXT
+    exit 0
+fi
+
+if [ ! -f "${config}" ]; then
+    printf "${red}Error${reset}: The configuration file '%s' does not exist.\n" "${config}" 1>&2
+    exit 1
+fi
+
+if ! errors=$(jq empty "${config}" 2>&1); then
+    printf "${red}Error${reset}: Configuration file '%s' cant be parsed:\n%s\n" "${config}" "${errors}" 1>&2
+    exit 1
+fi
+
+if [[ -z "${group}" && -n "${subgroup}" ]]; then
+    printf "${red}Error${reset}: You cannot specify a subgroup without a group.\n" 1>&2
+    exit 1
+fi
+
+stderr=$(mktemp)
+if ! loaded_commands="$(jq --raw-output --compact-output '
+    def is_command(command):
+        command | has("exec");
+
+    def valid_command(command):
+        # Substract valid keys from all keys in command to see if something stays
+        (command.exec | length > 0) and (command | keys - ["stdin", "env", "exec"] | length == 0);
+
+    def is_group(group):
+        group | length > 0;
+
+    def format(group; subgroup; command; params):
+        {
+            group: group,
+            subgroup: subgroup,
+            command: command,
+            exec: params.exec,
+            stdin: params.stdin,
+            envs: params.env
+        };
+
+    def commands(group; subgroup):
+        to_entries[] |
+        if is_command(.value) then
+            if valid_command(.value) then
+                format(group; subgroup; .key; .value)
+            else
+                error("Invalid configuration for command \"\(.key)\". Allowed fields are \"exec\", \"env\" and \"stdin\".")
+            end
+        elif is_group(.value) then
+            .key as $current |
+            .value | commands(
+                group // $current;
+                subgroup // (if group == null then null else $current end)
+            )
+        else
+            error("Invalid element in config: \(.key): \(.value | @json)")
+        end;
+
+    commands(null; null)' \
+    "${config}" 2> "${stderr}")"; then
+        printf "${red}Error${reset}: Failed to load commands from config file: \n%s\n" "$(cat "${stderr}")" 1>&2
+    rm -f "${stderr}"
+    exit 1
+fi
+rm -f "${stderr}"
+
+if [[ -z "${action}" ]]; then
+    # Disable "expressions don't expand in single quotes ..." for the fzf loading
+    # shellcheck disable=SC2016
+    selected=$(jq --raw-output \
+        --arg delimiter "${delimiter}" '
+        def fuzzy(command):
+            if command.group then command.group + " " else "" end + $delimiter
+            + if command.subgroup then command.subgroup + " " else "" end + $delimiter
+            + command.command + " " + $delimiter
+            + command.exec + $delimiter
+            + if command.envs then command.envs | tojson else "" end + $delimiter
+            + if command.stdin then command.stdin else "" end;
+
+        fuzzy(.)' <<< "${loaded_commands}" \
+        | fzf \
+        --with-nth=1,2,3 \
+        --delimiter="${delimiter}" \
+		--preview-window=wrap\
+		--preview='\
+			printf "%s\n\n%s\n\n%s\n\n"\
+			"$(if [[ -n {4} ]]; then echo exec: ${4}; fi)"\
+			"$(if [[ -n {5} ]]; then echo envs: ${5}; fi)"\
+			"$(if [[ -n {6} ]]; then echo stdin: ${6}; fi)"'
+    )
+    if [[ $? == "2" ]]; then
+        # Apparently fzf uses stderr to write the UI (https://github.com/junegunn/fzf/issues/3741) up until https://github.com/junegunn/fzf/commit/d274d093afa667a6ac5ee34579807de195ade784
+        # So the sdterr=$(mktemp) thing won't work with old versions
+        printf "${red}Error${reset}: Failed to load commands into fzf." 1>&2
+        exit 1
+    fi
+    if [[ -n "${selected}" ]]; then
+        group=$(echo "${selected}" | cut -d "${delimiter}" -f 1 | awk '{$1=$1};1')
+        subgroup=$(echo "${selected}" | cut -d "${delimiter}" -f 2 | awk '{$1=$1};1')
+        command=$(echo "${selected}" | cut -d "${delimiter}" -f 3 | awk '{$1=$1};1')
+        action="exec"
+    else
+        exit 0
+    fi
+fi
+
+if [[ "${action}" == "list" ]]; then
+    list=$(jq --raw-output \
+        --arg group "${group}" \
+        --arg subgroup "${subgroup}" \
+        --arg blue "${blue}" \
+        --arg green "${green}" \
+        --arg yellow  "${yellow}" \
+        --arg reset "${reset}" '
+        def list(command):
+            if command.group then $green + command.group + $reset + " " else "" end
+            + if command.subgroup then $yellow + command.subgroup + $reset + " " else "" end
+            + $blue + command.command + $reset + " "
+            + if command.exec | length > 50 then command.exec[0:50] + "..." else command.exec end + " "
+            + if command.envs then "(env) " else "" end
+            + if command.stdin then "(stdin)" else "" end;
+
+        def filter(command):
+            select(
+                (if $group != null and $group != "" then command.group == $group else "" end)
+                and (if $subgroup != null and $subgroup != "" then command.subgroup == $subgroup else "" end)
+            );
+
+        . | filter(.) | list(.)' <<< "${loaded_commands}"
+    )
+    printf '%b\n' "${list}"
+    exit 0
+fi
+
+if [[ "${action}" == "exec" ]]; then
+    details=$(jq --raw-output --compact-output \
+        --arg group "${group}" \
+        --arg subgroup "${subgroup}" \
+        --arg command "${command}" '
+        def filter(command):
+            select(
+                (.group == $group or ($group == "" and .group == null))
+                and (.subgroup == $subgroup or ($subgroup == "" and .subgroup == null))
+                and .command == $command
+            );
+
+        . | filter(.)' <<< "${loaded_commands}"
+    )
+
+    if [ -z "$details" ]; then
+        printf "${red}Error${reset}: The command '%s' does not exist. Maybe you are missing the group/subgroup?\n" "${command}" 1>&2
+        exit 1
+    fi
+
+    # Make sure to check with // empty, otherwise 'null' won't be detected by the -n below
+    exec=$(jq --raw-output --compact-output '.exec // empty' <<< "${details}")
+    stdin=$(jq --raw-output --compact-output '.stdin // empty' <<< "${details}")
+    stderr=$(mktemp)
+
+    if ! envs=$(jq --raw-output --compact-output '
+        def format:
+            if .key | test("^[A-Za-z_][A-Za-z0-9_]*$") then
+                "\(.key)=\"\(.value)\""
+            else
+                error("Invalid environment variable name: \(.key)")
+            end;
+
+            .envs // {} | to_entries | map(format) | join(" ")' <<< "${details}" 2> "${stderr}"); then
+        printf "${red}Error${reset}: Error in environment variable assignment for command '%s': \n%s\n" "${command}" "$(cat "${stderr}")" 1>&2
+        rm -f "${stderr}"
+        exit 1
+    fi
+    rm -f "${stderr}"
+
+    # Replace ' with '\'' to keep single quotes intact
+    exec=$(printf '%s' "${exec}" | sed "s/'/'\\\\''/g")
+
+    # Run commands in the shell that is used for executing boom
+    # Default to the systems standard shell
+    current_shell="${SHELL:-/bin/sh}"
+
+    # Use set -o pipefail in the subshell to ensure logical operators work as expected
+    eval_command="${current_shell} -c 'set -o pipefail; ${exec}'"
+    if [ -n "${envs}" ]; then
+        eval_command="${envs} ${eval_command}"
+    fi
+
+    # Make sure the command from exec fails to preserve exit codes
+    set -e
+
+	if [ -n "${stdin}" ]; then
+		eval "${eval_command}" <<< "${stdin}"
+	else
+		eval "${eval_command}"
+	fi
+fi
+
+exit 0

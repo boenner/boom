@@ -1,0 +1,168 @@
+{
+    "foobar": {
+        "exec": "echo \"foobar\""
+    },
+    "hello": {
+        "world": {
+            "env": {
+                "hello": "hello",
+                "world": "world"
+            },
+            "exec": "echo \"$hello $world\""
+        },
+        "moon": {
+            "env": {
+                "hello": "hello",
+                "moon": "moon"
+            },
+            "exec": "echo \"$hello $moon\""
+        }
+    },
+    "cat": {
+        "makes": {
+            "meow": {
+                "stdin": "meow",
+                "exec": "cat"
+            },
+            "meeoow": {
+                "stdin": "meeoow",
+                "exec": "cat"
+            }
+        }
+    },
+    "eilsel": {
+        "tsief": {
+            "env": {
+                "SORT_OPTION": "-r"
+            },
+            "stdin": "3\n1\n2\n",
+            "exec": "sort $SORT_OPTION"
+        }
+    },
+    "unix": {
+        "timestamp": {
+            "env": {
+                "DATE": "$(date -d @0 +\"%a %d %b %Y\")"
+            },
+            "stdin": "unix timestamp",
+            "exec": "echo -n \"$(cat -)\" && echo -n ' 0 is ' && echo \"$DATE\""
+        }
+    },
+    "duplicate": {
+        "entry": {
+            "exec": "echo 1"
+        }
+    },
+    "duplicate": {
+        "entry": {
+            "exec": "echo 2"
+        }
+    },
+    "space in group": {
+        "space in subgroup": {
+            "space in command": {
+                "exec": "echo 'whoa'"
+            }
+        }
+    },
+    "bar": {
+        "exec": "echo 'first bar'"
+    },
+    "foo": {
+        "bar": {
+            "exec": "echo 'second bar'"
+        }
+    },
+    "space": {
+        "env": {
+            "VARIABLE": "hello world"
+        },
+        "exec": "echo $VARIABLE"
+    },
+    "env starting with digit": {
+        "env": {
+            "1ENV": "hello world",
+            "VARIABLE": "hello world"
+        },
+        "exec": "echo $VARIABLE"
+    },
+    "env containing space": {
+        "env": {
+            "VAR IABLE": "hello world",
+            "VARIABLE": "hello world"
+        },
+        "exec": "echo $VARIABLE"
+    },
+    "env is empty": {
+        "env": {
+            "": "hello world",
+            "VARIABLE": "hello world"
+        },
+        "exec": "echo $VARIABLE"
+    },
+    "env containing hyphen": {
+        "env": {
+            "VAR-IABLE": "hello world",
+            "VARIABLE": "hello world"
+        },
+        "exec": "echo $VARIABLE"
+    },
+    "group": {
+        "subgroup": {
+            "foo": {
+                "exec": "echo \"foo\""
+            }
+        },
+        "bar": {
+            "exec": "echo \"bar\""
+        }
+    },
+    "pipe": {
+         "exec": "echo 'whoop' | grep 'whoop'"
+    },
+    "redirect-stdout": {
+        "exec": "echo 'stdout' > ./output && cat output"
+    },
+    "redirect-stdin": {
+        "exec": "cat < ./input"
+    },
+    "background-task": {
+        "exec": "sleep 1 & echo 'sleeping' && wait"
+    },
+    "stderr": {
+        "exec": "echo 'stderr' >&2"
+    },
+    "stdout-stderr": {
+        "exec": "echo 'stdout' && echo 'stderr' >&2"
+    },
+    "exit-code": {
+        "exec": "exit 123"
+    },
+    "pipe-concat-fail-first": {
+        "exec": "exit 2 | echo 'yeah'"
+    },
+    "pipe-concat-fail-second": {
+        "exec": "echo 'yeah' | exit 2 | echo 'yeah'"
+    },
+    "and-concat-fail": {
+        "exec": "exit 2 && echo 'nope'"
+    },
+    "or-concat-fail": {
+        "exec": "exit 2 || echo 'yeah'"
+    },
+    "long-output": {
+        "exec": "for i in {1..1000}; do echo \"$i\"; done"
+    },
+    "all-the-quotes": {
+        "exec": "echo \"'single' and \\\"double\\\"\""
+    },
+    "unicode": {
+        "exec": "echo '🤘'"
+    },
+    "env-fail": {
+        "env": {
+            "FAILS": "$(false)"
+        },
+        "exec": "echo 'yeah'"
+    }
+}

@@ -1,0 +1,14 @@
+{
+    "foobar": {
+        "env": {
+            "foo": "bar"
+        },
+        "exec": "echo \"$foo\"",
+        "foobaz": {
+            "env": {
+                "foo": "baz"
+            },
+            "exec": "echo \"$foo\""
+        }
+    }
+}

@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# greplog - load details for a release from CHANGELOG.md
+
+# Disable "don't use variables in printf" for all error messages
+# shellcheck disable=SC2059
+
+red="\033[0;31m"
+reset="\033[0m"
+
+dependencies=(
+	"grep"
+    "sed"
+)
+for dependency in "${dependencies[@]}"; do
+	if ! command -v "${dependency}" > /dev/null; then
+        printf "${red}Error${reset}: It seems like \"%s\" is not available. Please install it before running this script.\n" "${dependency}" 1>&2
+        exit 1
+	fi
+done
+
+if [ $# -ne 1 ]; then
+    printf "${red}Error${reset}: No release version given.\n" 1>&2
+    exit 1
+fi
+
+version=$1
+changelog="CHANGELOG.md"
+
+if [ ! -f "${changelog}" ]; then
+    printf "${red}Error${reset}: Changelog file \"%s\" does not exit.\n" "${changelog}" 1>&2
+    exit 1
+fi
+
+if ! grep -q "\[${version}\]" "${changelog}"; then
+    printf "${red}Error${reset}: Version \"%s\" could not be found in changelog.\n" "${version}" 1>&2
+    exit 1
+fi
+
+
+# Match from the specified version vX.X.X until the next line that starts with ## [
+# Print all matching versions and remove the last line
+release_notes=$(sed --quiet "/\[$version\]/,/^## \[[0-9]/p" "${changelog}")
+
+
+# When it's not the first release, the last line contains the previous release number
+# and needs to be removed
+if echo "${release_notes}" | tail -n 1 | grep -q "## \[[0-9]"; then
+    release_notes=$(echo "${release_notes}" | head -n -1)
+fi
+
+# Skip the first three lines to only get the details
+echo "${release_notes}" | tail -n +3
